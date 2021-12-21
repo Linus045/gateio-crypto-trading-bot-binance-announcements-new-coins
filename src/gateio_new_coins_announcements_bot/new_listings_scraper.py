@@ -117,7 +117,7 @@ def get_last_coin():
     uppers = None
 
     # returns nothing if it's an old coin or it's not an actual coin listing
-    if (
+    if len(found_coin) > 0 and (
         "Will List" not in latest_announcement
         or found_coin[0] == globals.latest_listing
         or found_coin[0] in previously_found_coins
