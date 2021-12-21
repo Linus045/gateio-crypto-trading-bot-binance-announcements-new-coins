@@ -17,12 +17,15 @@ from gateio_new_coins_announcements_bot.logger import LOG_DEBUG
 from gateio_new_coins_announcements_bot.logger import LOG_INFO
 from gateio_new_coins_announcements_bot.store_order import load_order
 
-client = load_gateio_creds("auth/auth.yml")
-spot_api = SpotApi(ApiClient(client))
+_supported_currencies = None
+_previously_found_coins = set()
+_spot_api = None
 
-supported_currencies = None
 
-previously_found_coins = set()
+def init_listings_scraper(auth_path):
+    global _spot_api
+    client = load_gateio_creds(auth_path)
+    _spot_api = SpotApi(ApiClient(client))
 
 
 def get_announcement():
@@ -120,7 +123,7 @@ def get_last_coin():
     if len(found_coin) > 0 and (
         "Will List" not in latest_announcement
         or found_coin[0] == globals.latest_listing
-        or found_coin[0] in previously_found_coins
+        or found_coin[0] in _previously_found_coins
     ):
 
         # if the latest Binance announcement is not a new coin listing,
@@ -129,11 +132,11 @@ def get_last_coin():
             config["TRADE_OPTIONS"]["KUCOIN_ANNOUNCEMENTS"]
             and "Gets Listed" in kucoin_announcement
             and kucoin_coin[0] != globals.latest_listing
-            and kucoin_coin[0] not in previously_found_coins
+            and kucoin_coin[0] not in _previously_found_coins
         ):
             if len(kucoin_coin) == 1:
                 uppers = kucoin_coin[0]
-                previously_found_coins.add(uppers)
+                _previously_found_coins.add(uppers)
                 LOG_INFO("New Kucoin coin detected: " + uppers)
             if len(kucoin_coin) != 1:
                 uppers = None
@@ -141,7 +144,7 @@ def get_last_coin():
     else:
         if len(found_coin) == 1:
             uppers = found_coin[0]
-            previously_found_coins.add(uppers)
+            _previously_found_coins.add(uppers)
             LOG_INFO("New coin detected: " + uppers)
         if len(found_coin) != 1:
             uppers = None
@@ -191,19 +194,19 @@ def get_all_currencies(single=False):
     Get a list of all currencies supported on gate io
     :return:
     """
-    global supported_currencies
+    global _supported_currencies
     while not globals.stop_threads:
         LOG_INFO("Getting the list of supported currencies from gate io")
-        all_currencies = ast.literal_eval(str(spot_api.list_currencies()))
+        all_currencies = ast.literal_eval(str(_spot_api.list_currencies()))
         currency_list = [currency["currency"] for currency in all_currencies]
         with open("currencies.json", "w") as f:
             json.dump(currency_list, f, indent=4)
             LOG_INFO(
                 "List of gate io currencies saved to currencies.json. Waiting 5 " "minutes before refreshing list..."
             )
-        supported_currencies = currency_list
+        _supported_currencies = currency_list
         if single:
-            return supported_currencies
+            return _supported_currencies
         else:
             for x in range(300):
                 time.sleep(1)
