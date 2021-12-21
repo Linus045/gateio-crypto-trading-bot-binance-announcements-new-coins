@@ -12,12 +12,11 @@ from gate_api import SpotApi
 
 import gateio_new_coins_announcements_bot.globals as globals
 from gateio_new_coins_announcements_bot.auth.gateio_auth import load_gateio_creds
-from gateio_new_coins_announcements_bot.load_config import load_config
+from gateio_new_coins_announcements_bot.load_config import get_config
 from gateio_new_coins_announcements_bot.logger import LOG_DEBUG
 from gateio_new_coins_announcements_bot.logger import LOG_INFO
 from gateio_new_coins_announcements_bot.store_order import load_order
 
-config = load_config("config.yml")
 client = load_gateio_creds("auth/auth.yml")
 spot_api = SpotApi(ApiClient(client))
 
@@ -106,6 +105,7 @@ def get_last_coin():
     """
     # scan Binance Announcement
     latest_announcement = get_announcement()
+    config = get_config()
 
     # enable Kucoin Announcements if True in config
     if config["TRADE_OPTIONS"]["KUCOIN_ANNOUNCEMENTS"]:

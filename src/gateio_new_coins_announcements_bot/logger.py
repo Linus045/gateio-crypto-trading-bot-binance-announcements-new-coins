@@ -2,7 +2,7 @@ import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
 
-from gateio_new_coins_announcements_bot.load_config import load_config
+from gateio_new_coins_announcements_bot.load_config import get_config
 from gateio_new_coins_announcements_bot.send_telegram import TelegramHandler
 from gateio_new_coins_announcements_bot.send_telegram import TelegramLogFilter
 
@@ -13,7 +13,7 @@ def init_logger():
     global _logger
 
     # loads local configuration
-    config = load_config("config.yml")
+    config = get_config()
 
     # Set default log settings
     log_level = "INFO"

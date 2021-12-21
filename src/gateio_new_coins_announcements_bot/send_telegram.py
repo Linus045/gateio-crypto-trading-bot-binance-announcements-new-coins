@@ -3,9 +3,7 @@ import logging
 import requests
 import yaml
 
-from gateio_new_coins_announcements_bot.load_config import load_config
-
-config = load_config("config.yml")
+from gateio_new_coins_announcements_bot.load_config import get_config
 
 with open("auth/auth.yml") as file:
     try:
@@ -33,6 +31,7 @@ class TelegramHandler(logging.Handler):
 
         key = getattr(record, "TELEGRAM")
 
+        config = get_config()
         # unknown message key
         if key not in config["TELEGRAM"]["NOTIFICATIONS"]:
             return
