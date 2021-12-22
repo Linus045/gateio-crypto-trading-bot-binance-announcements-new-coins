@@ -5,15 +5,22 @@ import yaml
 
 from gateio_new_coins_announcements_bot.load_config import get_config
 
-with open("auth/auth.yml") as file:
-    try:
-        creds = yaml.load(file, Loader=yaml.FullLoader)
-        bot_token = creds["telegram_token"]
-        bot_chatID = str(creds["telegram_chat_id"])
-        valid_auth = True
-    except KeyError:
-        valid_auth = False
-        pass
+_valid_auth = False
+_bot_token = None
+_bot_chatID = None
+
+
+def init_telegram(auth_path):
+    global _valid_auth, _bot_token, _bot_chatID
+    with open(auth_path) as file:
+        try:
+            creds = yaml.load(file, Loader=yaml.FullLoader)
+            _bot_token = str(creds["telegram_token"])
+            _bot_chatID = str(creds["telegram_chat_id"])
+            _valid_auth = True
+        except KeyError:
+            _valid_auth = False
+            pass
 
 
 class TelegramLogFilter(logging.Filter):
@@ -26,7 +33,7 @@ class TelegramHandler(logging.Handler):
     # log to telegram if the TELEGRAM extra matches an enabled key
     def emit(self, record):
 
-        if not valid_auth:
+        if not _valid_auth:
             return
 
         key = getattr(record, "TELEGRAM")
@@ -41,8 +48,8 @@ class TelegramHandler(logging.Handler):
             return
 
         requests.get(
-            f"""https://api.telegram.org/bot{bot_token}/sendMessage
-            ?chat_id={bot_chatID}
+            f"""https://api.telegram.org/bot{_bot_token}/sendMessage
+            ?chat_id={_bot_chatID}
             &parse_mode=Markdown
             &text={record.message}"""
         )
