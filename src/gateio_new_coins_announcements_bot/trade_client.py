@@ -9,10 +9,18 @@ from gateio_new_coins_announcements_bot.logger import LOG_DEBUG
 from gateio_new_coins_announcements_bot.logger import LOG_ERROR
 from gateio_new_coins_announcements_bot.logger import LOG_INFO
 
-client = load_gateio_creds("auth/auth.yml")
-spot_api = SpotApi(ApiClient(client))
+_last_trade = None
+_spot_api = None
 
-last_trade = None
+
+def init_trade_client(auth_path):
+    global _spot_api
+    client = load_gateio_creds(auth_path)
+    _spot_api = SpotApi(ApiClient(client))
+
+
+def get_spot_api():
+    return _spot_api
 
 
 def get_last_price(base, quote, return_price_only):
@@ -20,19 +28,19 @@ def get_last_price(base, quote, return_price_only):
     Args:
     'DOT', 'USDT'
     """
-    global last_trade
-    trades = spot_api.list_trades(currency_pair=f"{base}_{quote}", limit=1)
+    global _last_trade
+    trades = _spot_api.list_trades(currency_pair=f"{base}_{quote}", limit=1)
     assert len(trades) == 1
     trade = trades[0]
 
     create_time_ms = datetime.utcfromtimestamp(int(trade.create_time_ms.split(".")[0]) / 1000)
     create_time_formatted = create_time_ms.strftime("%d-%m-%y %H:%M:%S.%f")
 
-    if last_trade and last_trade.id > trade.id:
+    if _last_trade and _last_trade.id > trade.id:
         LOG_DEBUG("STALE TRADEBOOK RESULT FOUND. RE-TRYING.")
         return get_last_price(base=base, quote=quote, return_price_only=return_price_only)
     else:
-        last_trade = trade
+        _last_trade = trade
 
     if return_price_only:
         return trade.price
@@ -50,7 +58,7 @@ def get_min_amount(base, quote):
     'DOT', 'USDT'
     """
     try:
-        min_amount = spot_api.get_currency_pair(currency_pair=f"{base}_{quote}").min_quote_amount
+        min_amount = _spot_api.get_currency_pair(currency_pair=f"{base}_{quote}").min_quote_amount
     except Exception as e:
         LOG_ERROR(e)
     else:
@@ -70,7 +78,7 @@ def place_order(base, quote, amount, side, last_price):
             currency_pair=f"{base}_{quote}",
             time_in_force="ioc",
         )
-        order = spot_api.create_order(order)
+        order = _spot_api.create_order(order)
         t = order
         LOG_INFO(
             f"PLACE ORDER: {t.side} | {t.id} | {t.account} | {t.type} | {t.currency_pair} | {t.status} | "

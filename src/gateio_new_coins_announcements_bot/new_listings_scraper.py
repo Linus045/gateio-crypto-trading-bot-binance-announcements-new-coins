@@ -7,11 +7,8 @@ import string
 import time
 
 import requests
-from gate_api import ApiClient
-from gate_api import SpotApi
 
 import gateio_new_coins_announcements_bot.globals as globals
-from gateio_new_coins_announcements_bot.auth.gateio_auth import load_gateio_creds
 from gateio_new_coins_announcements_bot.load_config import get_config
 from gateio_new_coins_announcements_bot.logger import LOG_DEBUG
 from gateio_new_coins_announcements_bot.logger import LOG_INFO
@@ -19,13 +16,11 @@ from gateio_new_coins_announcements_bot.store_order import load_order
 
 _supported_currencies = None
 _previously_found_coins = set()
-_spot_api = None
 
 
-def init_listings_scraper(auth_path):
+def init_listings_scraper(spot_api):
     global _spot_api
-    client = load_gateio_creds(auth_path)
-    _spot_api = SpotApi(ApiClient(client))
+    _spot_api = spot_api
 
 
 def get_announcement():
