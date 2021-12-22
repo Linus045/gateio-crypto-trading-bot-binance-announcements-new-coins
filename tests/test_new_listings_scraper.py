@@ -1,8 +1,10 @@
+import re
+
 import pytest
 import requests
 import requests_mock as req_mock
 
-from gateio_new_coins_announcements_bot.new_listings_scraper import get_announcement
+from gateio_new_coins_announcements_bot.new_listings_scraper import get_binance_announcement
 from gateio_new_coins_announcements_bot.new_listings_scraper import get_kucoin_announcement
 from gateio_new_coins_announcements_bot.new_listings_scraper import get_last_coin
 
@@ -19,19 +21,19 @@ class TestCase_latest_announcement:
 
         with req_mock.Mocker() as m:
             m.get(req_mock.ANY, json=create_fake_announcement_object(title))
-            assert get_announcement() == title
+            assert get_binance_announcement() == title
 
     def test_latest_announcement_throws_when_get_request_excepts(self, mocker, fake_log):
         with req_mock.Mocker() as m:
             m.get(req_mock.ANY, exc=requests.exceptions.ConnectionError)
             with pytest.raises(requests.exceptions.ConnectionError):
-                get_announcement()
+                get_binance_announcement()
 
     @pytest.mark.skip("TODO: Get example error messages that could occur")
     def test_latest_announcement_throws_when_get_request_fails(self, mocker, fake_log):
         with req_mock.Mocker() as m:
             m.get(req_mock.ANY, status_code=400, json={})
-            get_announcement()
+            get_binance_announcement()
 
 
 class TestCase_get_kucoin_announcement:
@@ -73,24 +75,30 @@ class TestCase_get_last_coin:
             mocker.patch("gateio_new_coins_announcements_bot.new_listings_scraper.get_config", return_value=fake_config)
             assert get_last_coin() is None
 
-    @pytest.mark.xfail(reason="Kucoin coin announements are implemented incorrectly")
     def test_get_last_coin_extracts_correctly_from_announcement_with_kucoin(self, mocker, fake_log):
-        title = "KuCoin Opens UnMarshal (MARSH) Deposit Service"
+        title = "Geeq (GEEQ) Gets Listed on KuCoin!"
 
         with req_mock.Mocker() as m:
-            m.get(req_mock.ANY, json=create_fake_announcement_object(title, use_kucoin_announcement_format=True))
+            binance_matcher = re.compile(r"www\.binance")
+            kucoin_matcher = re.compile(r"www\.kucoin")
+            m.get(binance_matcher, json=create_fake_announcement_object(title))
+            m.get(kucoin_matcher, json=create_fake_announcement_object(title, use_kucoin_announcement_format=True))
+
             fake_config = {"TRADE_OPTIONS": {"KUCOIN_ANNOUNCEMENTS": True}}
             mocker.patch("gateio_new_coins_announcements_bot.new_listings_scraper.get_config", return_value=fake_config)
-            assert get_last_coin() == "MARSH"
+            assert get_last_coin() == "GEEQ"
 
-    @pytest.mark.xfail(reason="Kucoin coin announements are implemented incorrectly")
     def test_get_last_coin_returns_None_for_invalid_announement_with_kucoin(self, mocker, fake_log):
         title = (
             "Trade & Learn! Explore the Ethernity 2.0 Roadmap: 5,550 ERN To Be Shared! Rewards has been distributed!"
         )
 
         with req_mock.Mocker() as m:
-            m.get(req_mock.ANY, json=create_fake_announcement_object(title, use_kucoin_announcement_format=True))
+            binance_matcher = re.compile(r"www\.binance")
+            kucoin_matcher = re.compile(r"www\.kucoin")
+            m.get(binance_matcher, json=create_fake_announcement_object(title))
+            m.get(kucoin_matcher, json=create_fake_announcement_object(title, use_kucoin_announcement_format=True))
+
             fake_config = {"TRADE_OPTIONS": {"KUCOIN_ANNOUNCEMENTS": True}}
             mocker.patch("gateio_new_coins_announcements_bot.new_listings_scraper.get_config", return_value=fake_config)
             assert get_last_coin() is None

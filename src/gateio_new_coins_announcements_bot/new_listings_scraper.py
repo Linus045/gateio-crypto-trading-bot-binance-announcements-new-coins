@@ -23,12 +23,7 @@ def init_listings_scraper(spot_api):
     _spot_api = spot_api
 
 
-def get_announcement():
-    """
-    Retrieves new coin listing announcements
-
-    """
-    LOG_DEBUG("Pulling announcement page")
+def generate_binance_announcement_query():
     # Generate random query/params to help prevent caching
     rand_page_size = random.randint(1, 200)
     letters = string.ascii_letters
@@ -44,28 +39,13 @@ def get_announcement():
     ]
     random.shuffle(queries)
     LOG_DEBUG(f"Queries: {queries}")
-    request_url = (
+    return (
         f"https://www.binancezh.com/gateway-api/v1/public/cms/article/list/query"
         f"?{queries[0]}&{queries[1]}&{queries[2]}&{queries[3]}&{queries[4]}&{queries[5]}"
     )
-    latest_announcement = requests.get(request_url)
-    try:
-        LOG_DEBUG(f'X-Cache: {latest_announcement.headers["X-Cache"]}')
-    except KeyError:
-        # No X-Cache header was found - great news, we're hitting the source.
-        pass
-
-    latest_announcement = latest_announcement.json()
-    LOG_DEBUG("Finished pulling announcement page")
-    return latest_announcement["data"]["catalogs"][0]["articles"][0]["title"]
 
 
-def get_kucoin_announcement():
-    """
-    Retrieves new coin listing announcements from Kucoin
-
-    """
-    LOG_DEBUG("Pulling announcement page")
+def generate_kucoin_announcement_query():
     # Generate random query/params to help prevent caching
     rand_page_size = random.randint(1, 200)
     letters = string.ascii_letters
@@ -81,70 +61,76 @@ def get_kucoin_announcement():
     ]
     random.shuffle(queries)
     LOG_DEBUG(f"Queries: {queries}")
-    request_url = (
+    return (
         f"https://www.kucoin.com/_api/cms/articles?"
         f"?{queries[0]}&{queries[1]}&{queries[2]}&{queries[3]}&{queries[4]}&{queries[5]}"
     )
+
+
+def get_kucoin_announcement():
+    request_url = generate_kucoin_announcement_query()
     latest_announcement = requests.get(request_url)
     try:
         LOG_DEBUG(f'X-Cache: {latest_announcement.headers["X-Cache"]}')
     except KeyError:
         # No X-Cache header was found - great news, we're hitting the source.
         pass
-
     latest_announcement = latest_announcement.json()
     LOG_DEBUG("Finished pulling announcement page")
     return latest_announcement["items"][0]["title"]
+
+
+def get_binance_announcement():
+    request_url = generate_binance_announcement_query()
+    latest_announcement = requests.get(request_url)
+    LOG_DEBUG("Finished pulling announcement page")
+    try:
+        LOG_DEBUG(f'X-Cache: {latest_announcement.headers["X-Cache"]}')
+    except KeyError:
+        # No X-Cache header was found - great news, we're hitting the source.
+        pass
+    latest_announcement = latest_announcement.json()
+    return latest_announcement["data"]["catalogs"][0]["articles"][0]["title"]
 
 
 def get_last_coin():
     """
     Returns new Symbol when appropriate
     """
-    # scan Binance Announcement
-    latest_announcement = get_announcement()
-    config = get_config()
-
-    # enable Kucoin Announcements if True in config
-    if config["TRADE_OPTIONS"]["KUCOIN_ANNOUNCEMENTS"]:
-        LOG_INFO("Kucoin announcements enabled, look for new Kucoin coins...")
-        kucoin_announcement = get_kucoin_announcement()
-        kucoin_coin = re.findall(r"\(([^)]+)", kucoin_announcement)
-
-    found_coin = re.findall(r"\(([^)]+)", latest_announcement)
+    found_coin = None
     uppers = None
 
-    # returns nothing if it's an old coin or it's not an actual coin listing
-    if len(found_coin) > 0 and (
-        "Will List" not in latest_announcement
-        or found_coin[0] == globals.latest_listing
-        or found_coin[0] in _previously_found_coins
-    ):
+    config = get_config()
+    check_kucoin_announcements = config["TRADE_OPTIONS"]["KUCOIN_ANNOUNCEMENTS"] is True
 
-        # if the latest Binance announcement is not a new coin listing,
-        # or the listing has already been returned, check kucoin
-        if (
-            config["TRADE_OPTIONS"]["KUCOIN_ANNOUNCEMENTS"]
-            and "Gets Listed" in kucoin_announcement
-            and kucoin_coin[0] != globals.latest_listing
-            and kucoin_coin[0] not in _previously_found_coins
-        ):
-            if len(kucoin_coin) == 1:
-                uppers = kucoin_coin[0]
+    # scan Binance Announcement
+    latest_announcement = get_binance_announcement()
+    if "Will List" in latest_announcement:
+        found_coins = re.findall(r"\(([^)]+)", latest_announcement)
+        if len(found_coins) > 0:
+            found_coin = found_coins[0]
+            if found_coin != globals.latest_listing and found_coin not in _previously_found_coins:
+                uppers = found_coin
                 _previously_found_coins.add(uppers)
-                LOG_INFO("New Kucoin coin detected: " + uppers)
-            if len(kucoin_coin) != 1:
-                uppers = None
+                LOG_INFO("New coin detected: " + uppers)
 
-    else:
-        if len(found_coin) == 1:
-            uppers = found_coin[0]
-            _previously_found_coins.add(uppers)
-            LOG_INFO("New coin detected: " + uppers)
-        if len(found_coin) != 1:
-            uppers = None
+    # if no result on binance and  check Kucoin Announcements if its enabled
+    if uppers is None and check_kucoin_announcements:
+        LOG_INFO("Kucoin announcements enabled, look for new Kucoin coins...")
+        kucoin_coin = None
+        kucoin_announcement = get_kucoin_announcement()
+        if "Gets Listed" in kucoin_announcement:
+            kucoin_coins = re.findall(r"\(([^)]+)", kucoin_announcement)
+            if len(kucoin_coins) > 0:
+                kucoin_coin = kucoin_coins[0]
+
+                # if the latest Binance announcement is not a new coin listing,
+                # or the listing has already been returned, check kucoin
+                if kucoin_coin != globals.latest_listing and kucoin_coin not in _previously_found_coins:
+                    uppers = kucoin_coin
+                    _previously_found_coins.add(uppers)
+                    LOG_INFO("New Kucoin coin detected: " + uppers)
     print(f"{uppers=}")
-
     return uppers
 
 
